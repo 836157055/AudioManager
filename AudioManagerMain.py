@@ -24,6 +24,11 @@ class SettingsDialog(QDialog):
         self.layout.addWidget(self.save_button)
         self.setLayout(self.layout)
         self.load_settings()
+        self.slider = QSlider(Qt.Horizontal)
+        self.slider.setRange(0, 100)
+        self.slider.setValue(0)
+        self.slider.sliderMoved.connect(self.set_position)
+        self.layout.addWidget(self.slider)
 
     def load_settings(self):
         if os.path.exists("config.txt"):
@@ -70,15 +75,9 @@ class AudioManager(QMainWindow):
         self.progress_label = QLabel("Progress: 00:00 / 00:00")
         self.layout.addWidget(self.progress_label)
 
-        self.figure, self.ax = plt.subplots()
+        self.figure, self.ax = plt.subplots(figsize=(10, 2))  # Adjust the height of the waveform
         self.canvas = FigureCanvas(self.figure)
         self.layout.addWidget(self.canvas)
-
-        self.slider = QSlider(Qt.Horizontal)
-        self.slider.setRange(0, 100)
-        self.slider.setValue(0)
-        self.slider.sliderMoved.connect(self.set_position)
-        self.layout.addWidget(self.slider)
 
         pygame.mixer.init()
         self.currently_playing = None
@@ -88,6 +87,13 @@ class AudioManager(QMainWindow):
         self.similar_files = []
 
         self.load_settings()
+        self.slider = QSlider(Qt.Horizontal)
+        self.slider.setRange(0, 100)
+        self.slider.setValue(0)
+        self.slider.sliderMoved.connect(self.set_position)
+        self.layout.addWidget(self.slider)
+
+        self.canvas.mpl_connect('button_press_event', self.on_waveform_click)
 
     def load_settings(self):
         if os.path.exists("config.txt"):
@@ -152,8 +158,15 @@ class AudioManager(QMainWindow):
     def on_playback_complete(self):
         self.timer.stop()
         self.currently_playing = None
-        self.slider.setValue(0)
         self.progress_label.setText("Progress: 00:00 / 00:00")
+
+    def set_position(self, position):
+        if self.currently_playing:
+            total_time = librosa.get_duration(path=self.currently_playing)
+            pos = int((position / 100) * total_time * 1000)
+            pygame.mixer.music.play(0, pos / 1000)
+            self.update_progress()  # 更新进度显示
+            self.plot_waveform(self.currently_playing, pos / 1000)  # 更新波形图
 
     def update_progress(self):
         if self.currently_playing:
@@ -164,11 +177,33 @@ class AudioManager(QMainWindow):
             self.slider.setValue(progress)
             self.plot_waveform(self.currently_playing, current_time)
 
-    def set_position(self, position):
-        if self.currently_playing:
-            total_time = librosa.get_duration(path=self.currently_playing)
-            pos = int((position / 100) * total_time * 1000)
-            pygame.mixer.music.play(0, pos / 1000)
+    def plot_waveform(self, file_path, current_time=0):
+        y, sr = librosa.load(file_path)
+        total_time = librosa.get_duration(y=y, sr=sr)
+        current_samples = int(current_time * sr)
+
+
+        self.ax.clear()
+        self.ax.plot(np.arange(len(y)) / sr, y, color="gray")
+        if current_samples > 0:
+            self.ax.plot(np.arange(current_samples) / sr, y[:current_samples], color="blue")
+        self.ax.set_title("Waveform")
+        self.ax.set_xlabel("Time (s)")
+        self.ax.set_ylabel("Amplitude")
+        self.canvas.draw()  # 在这里更新画布
+
+        def on_click(event):
+            if event.inaxes == self.ax:
+                click_time = event.xdata
+                position = (click_time / total_time) * 100
+                self.set_position(position)
+
+        self.canvas.mpl_connect('button_press_event', on_click)
+
+    def format_time(self, seconds):
+        mins = int(seconds // 60)
+        secs = int(seconds % 60)
+        return f"{mins:02}:{secs:02}"
 
     def plot_waveform(self, file_path, current_time=0):
         y, sr = librosa.load(file_path)
@@ -180,7 +215,19 @@ class AudioManager(QMainWindow):
         self.ax.set_title("Waveform")
         self.ax.set_xlabel("Time (s)")
         self.ax.set_ylabel("Amplitude")
+        self.ax.text(0.95, 0.01, f"{self.format_time(current_time)} / {self.format_time(total_time)}",
+                     verticalalignment='bottom', horizontalalignment='right',
+                     transform=self.ax.transAxes, color='green', fontsize=12)
         self.canvas.draw()
+
+    def on_waveform_click(self, event):
+        if self.currently_playing:
+            y, sr = librosa.load(self.currently_playing)
+            total_time = librosa.get_duration(y=y, sr=sr)
+            click_time = event.xdata
+            if click_time is not None:
+                pygame.mixer.music.play(0, click_time)
+                self.update_progress()
 
     def format_time(self, seconds):
         mins = int(seconds // 60)
