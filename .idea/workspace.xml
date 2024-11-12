@@ -4,14 +4,10 @@
     <option name="autoReloadType" value="SELECTIVE" />
   </component>
   <component name="ChangeListManager">
-    <list default="true" id="15905821-475b-441d-86ec-4be39027e9a5" name="更改" comment="调整波形显示和大小">
-      <change afterPath="$PROJECT_DIR$/AudioProcessor.py" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/SettingsDialog.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/.idea/AudioManager.iml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/AudioManager.iml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/.idea/misc.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/misc.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/.idea/runConfigurations/_template__of_Python.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/runConfigurations/_template__of_Python.xml" afterDir="false" />
+    <list default="true" id="15905821-475b-441d-86ec-4be39027e9a5" name="更改" comment="修改波形显示和界面相关">
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/AudioManagerMain.py" beforeDir="false" afterPath="$PROJECT_DIR$/AudioManagerMain.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/SettingsDialog.py" beforeDir="false" afterPath="$PROJECT_DIR$/SettingsDialog.py" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/config.txt" beforeDir="false" afterPath="$PROJECT_DIR$/config.txt" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
@@ -132,7 +128,15 @@
       <option name="project" value="LOCAL" />
       <updated>1731321949630</updated>
     </task>
-    <option name="localTasksCounter" value="3" />
+    <task id="LOCAL-00003" summary="修改波形显示和界面相关">
+      <option name="closed" value="true" />
+      <created>1731395024655</created>
+      <option name="number" value="00003" />
+      <option name="presentableId" value="LOCAL-00003" />
+      <option name="project" value="LOCAL" />
+      <updated>1731395024655</updated>
+    </task>
+    <option name="localTasksCounter" value="4" />
     <servers />
   </component>
   <component name="Vcs.Log.History.Properties">
@@ -159,6 +163,7 @@
   <component name="VcsManagerConfiguration">
     <MESSAGE value="修改目录" />
     <MESSAGE value="调整波形显示和大小" />
-    <option name="LAST_COMMIT_MESSAGE" value="调整波形显示和大小" />
+    <MESSAGE value="修改波形显示和界面相关" />
+    <option name="LAST_COMMIT_MESSAGE" value="修改波形显示和界面相关" />
   </component>
 </project>
