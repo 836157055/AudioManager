@@ -5,42 +5,14 @@ import librosa
 import numpy as np
 import matplotlib.pyplot as plt
 from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigureCanvas
-from PyQt5.QtWidgets import QApplication, QMainWindow, QWidget, QVBoxLayout, QPushButton, QFileDialog, QTableWidget, QTableWidgetItem, QHeaderView, QAbstractItemView, QLabel, QSlider, QHBoxLayout, QLineEdit, QDialog, QFormLayout
-from PyQt5.QtCore import Qt, QTimer, QMimeData
-from PyQt5.QtGui import QDrag
+from PyQt5.QtWidgets import QApplication, QMainWindow, QWidget, QVBoxLayout, QPushButton, QFileDialog, QTableWidget, QTableWidgetItem, QHeaderView, QAbstractItemView, QLabel, QFormLayout, QLineEdit, QDialog, QProgressBar, QHBoxLayout, QListWidget, QListWidgetItem, QStackedLayout, QSpinBox
+from PyQt5.QtCore import Qt, QTimer, QMimeData, QThread, pyqtSignal, QObject
+from PyQt5.QtGui import QDragEnterEvent, QDropEvent
 
 from extract_features import extract_features
 from calculate_similarity import calculate_similarity
-
-class SettingsDialog(QDialog):
-    def __init__(self, parent=None):
-        super().__init__(parent)
-        self.setWindowTitle("Settings")
-        self.layout = QFormLayout()
-        self.audio_library_path_input = QLineEdit()
-        self.layout.addRow("Audio Library Path:", self.audio_library_path_input)
-        self.save_button = QPushButton("Save")
-        self.save_button.clicked.connect(self.save_settings)
-        self.layout.addWidget(self.save_button)
-        self.setLayout(self.layout)
-        self.load_settings()
-        self.slider = QSlider(Qt.Horizontal)
-        self.slider.setRange(0, 100)
-        self.slider.setValue(0)
-        self.slider.sliderMoved.connect(self.set_position)
-        self.layout.addWidget(self.slider)
-
-    def load_settings(self):
-        if os.path.exists("config.txt"):
-            with open("config.txt", "r") as file:
-                path = file.readline().strip()
-                self.audio_library_path_input.setText(path)
-
-    def save_settings(self):
-        path = self.audio_library_path_input.text()
-        with open("config.txt", "w") as file:
-            file.write(path)
-        self.accept()
+from SettingsDialog import SettingsDialog
+from AudioProcessor import AudioProcessor
 
 class AudioManager(QMainWindow):
     def __init__(self):
@@ -52,10 +24,13 @@ class AudioManager(QMainWindow):
         self.layout = QVBoxLayout()
         self.central_widget.setLayout(self.layout)
 
-        self.drag_area = QLabel("Drag Audio Files Here")
-        self.drag_area.setAlignment(Qt.AlignCenter)
-        self.drag_area.setStyleSheet("border: 2px dashed #aaa;")
-        self.layout.addWidget(self.drag_area)
+        self.reference_control_layout = QHBoxLayout()
+        self.reference_label = QLabel("Reference Audio: None")
+        self.reference_control_layout.addWidget(self.reference_label)
+        self.play_pause_button = QPushButton("Play/Pause")
+        self.play_pause_button.clicked.connect(self.play_pause_reference)
+        self.reference_control_layout.addWidget(self.play_pause_button)
+        self.layout.addLayout(self.reference_control_layout)
 
         self.upload_button = QPushButton("Upload Reference Audio")
         self.upload_button.clicked.connect(self.upload_reference_audio)
@@ -65,67 +40,120 @@ class AudioManager(QMainWindow):
         self.settings_button.clicked.connect(self.open_settings)
         self.layout.addWidget(self.settings_button)
 
+        self.progress_bar = QProgressBar()
+        self.progress_bar.setVisible(False)
+        self.layout.addWidget(self.progress_bar)
+
+        self.log_label = QLabel("Release mouse to load reference file")
+        self.log_label.setAlignment(Qt.AlignCenter)
+        self.log_label.setStyleSheet("background-color: yellow; font-size: 16px;")
+        self.log_label.setVisible(False)
+        self.layout.addWidget(self.log_label)
+
         self.table_widget = QTableWidget()
         self.table_widget.setColumnCount(4)
         self.table_widget.setHorizontalHeaderLabels(["File Name", "Path", "Similarity", "Play"])
         self.table_widget.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch)
         self.table_widget.setSelectionBehavior(QAbstractItemView.SelectRows)
+        self.table_widget.setEditTriggers(QAbstractItemView.NoEditTriggers)  # Make the table read-only
         self.layout.addWidget(self.table_widget)
 
         self.progress_label = QLabel("Progress: 00:00 / 00:00")
         self.layout.addWidget(self.progress_label)
 
-        self.figure, self.ax = plt.subplots(figsize=(10, 2))  # Adjust the height of the waveform
+        self.figure, self.ax = plt.subplots(figsize=(10, 4))  # Adjust the height of the waveform
         self.canvas = FigureCanvas(self.figure)
         self.layout.addWidget(self.canvas)
+
+        self.overlay = QLabel(self.central_widget)
+        self.overlay.setStyleSheet("background-color: rgba(0, 0, 0, 128);")
+        self.overlay.setVisible(False)
+        self.overlay.setGeometry(0, 0, self.width(), self.height())
+
+        self.refresh_rate_spinbox = QSpinBox()
+        self.refresh_rate_spinbox.setRange(100, 5000)
+        self.refresh_rate_spinbox.setValue(500)
+        self.refresh_rate_spinbox.valueChanged.connect(self.update_refresh_rate)
+        self.layout.addWidget(QLabel("Waveform Refresh Rate (ms):"))
+        self.layout.addWidget(self.refresh_rate_spinbox)
 
         pygame.mixer.init()
         self.currently_playing = None
         self.timer = QTimer(self)
-        self.timer.setInterval(500)
+        self.timer.setInterval(self.refresh_rate_spinbox.value())
         self.timer.timeout.connect(self.update_progress)
         self.similar_files = []
 
         self.load_settings()
-        self.slider = QSlider(Qt.Horizontal)
-        self.slider.setRange(0, 100)
-        self.slider.setValue(0)
-        self.slider.sliderMoved.connect(self.set_position)
-        self.layout.addWidget(self.slider)
 
         self.canvas.mpl_connect('button_press_event', self.on_waveform_click)
 
+        self.setAcceptDrops(True)
+
     def load_settings(self):
+        self.audio_library_paths = []
         if os.path.exists("config.txt"):
             with open("config.txt", "r") as file:
-                self.audio_library_path = file.readline().strip()
-        else:
-            self.audio_library_path = ""
+                self.audio_library_paths = [line.strip() for line in file.readlines()]
+
+    def save_settings(self):
+        with open("config.txt", "w") as file:
+            for path in self.audio_library_paths:
+                file.write(f"{path}\n")
+
+    def import_settings(self):
+        file_path, _ = QFileDialog.getOpenFileName(self, "Import Settings", "", "Config Files (*.txt)")
+        if file_path:
+            with open(file_path, "r") as file:
+                self.audio_library_paths = [line.strip() for line in file.readlines()]
+            self.save_settings()
+
+    def export_settings(self):
+        file_path, _ = QFileDialog.getSaveFileName(self, "Export Settings", "", "Config Files (*.txt)")
+        if file_path:
+            with open(file_path, "w") as file:
+                for path in self.audio_library_paths:
+                    file.write(f"{path}\n")
 
     def open_settings(self):
         dialog = SettingsDialog(self)
         if dialog.exec_():
-            self.audio_library_path = dialog.audio_library_path_input.text()
+            self.audio_library_paths = [dialog.audio_library_paths_list.item(i).text() for i in range(dialog.audio_library_paths_list.count())]
+            self.save_settings()
 
     def upload_reference_audio(self):
         file_path, _ = QFileDialog.getOpenFileName(self, "Open Reference Audio", "", "Audio Files (*.wav *.mp3)")
         if file_path:
-            self.process_audio(file_path)
+            self.process_reference_audio(file_path)
+
+    def process_reference_audio(self, file_path):
+        self.reference_label.setText(f"Reference Audio: {os.path.basename(file_path)}")
+        self.reference_file_path = file_path
+        self.process_audio(file_path)
 
     def process_audio(self, file_path):
-        ref_mfcc = extract_features(file_path)
+        self.progress_bar.setVisible(True)
+        self.log_label.setText("Loading reference audio...")
+        self.log_label.setVisible(True)
+        self.overlay.setVisible(True)
+        self.set_elements_enabled(False)
+        self.table_widget.setRowCount(0)
+        self.ref_mfcc = extract_features(file_path)
         self.similar_files = []
-        for root, dirs, files in os.walk(self.audio_library_path):
-            for file in files:
-                if file.endswith(".wav"):
-                    audio_path = os.path.join(root, file)
-                    lib_mfcc = extract_features(audio_path)
-                    similarity = calculate_similarity(ref_mfcc, lib_mfcc)
-                    self.similar_files.append((file, audio_path, similarity))
-        self.similar_files.sort(key=lambda x: x[2])
-        self.display_results()
+        self.thread = QThread()
+        self.worker = AudioProcessor(self.audio_library_paths, self.ref_mfcc)
+        self.worker.moveToThread(self.thread)
+        self.worker.progress.connect(self.update_progress_bar)
+        self.worker.finished.connect(self.display_results)
+        self.thread.started.connect(self.worker.run)
+        self.thread.start()
 
-    def display_results(self):
+    def update_progress_bar(self, value, total):
+        self.progress_bar.setMaximum(total)
+        self.progress_bar.setValue(value)
+
+    def display_results(self, similar_files):
+        self.similar_files = similar_files
         self.table_widget.setRowCount(0)
         for idx, (file, path, similarity) in enumerate(self.similar_files):
             self.table_widget.insertRow(idx)
@@ -135,6 +163,25 @@ class AudioManager(QMainWindow):
             play_button = QPushButton("Play/Pause")
             play_button.clicked.connect(lambda _, p=path: self.on_play_button_click(p))
             self.table_widget.setCellWidget(idx, 3, play_button)
+        self.progress_bar.setVisible(False)
+        self.log_label.setVisible(False)
+        self.overlay.setVisible(False)
+        self.set_elements_enabled(True)
+        self.thread.quit()
+
+    def play_pause_reference(self):
+        if self.currently_playing == self.reference_file_path:
+            pygame.mixer.music.stop()
+            self.currently_playing = None
+            self.timer.stop()
+        else:
+            pygame.mixer.music.load(self.reference_file_path)
+            pygame.mixer.music.play()
+            self.currently_playing = self.reference_file_path
+            self.timer.start()
+            self.plot_waveform(self.reference_file_path)
+            pygame.mixer.music.set_endevent(pygame.USEREVENT)
+            self.installEventFilter(self)
 
     def on_play_button_click(self, file_path):
         if self.currently_playing == file_path:
@@ -160,59 +207,38 @@ class AudioManager(QMainWindow):
         self.currently_playing = None
         self.progress_label.setText("Progress: 00:00 / 00:00")
 
-    def set_position(self, position):
-        if self.currently_playing:
-            total_time = librosa.get_duration(path=self.currently_playing)
-            pos = int((position / 100) * total_time * 1000)
-            pygame.mixer.music.play(0, pos / 1000)
-            self.update_progress()  # 更新进度显示
-            self.plot_waveform(self.currently_playing, pos / 1000)  # 更新波形图
-
     def update_progress(self):
         if self.currently_playing:
             current_time = pygame.mixer.music.get_pos() / 1000
             total_time = librosa.get_duration(path=self.currently_playing)
-            progress = int((current_time / total_time) * 100)
             self.progress_label.setText(f"Progress: {self.format_time(current_time)} / {self.format_time(total_time)}")
-            self.slider.setValue(progress)
             self.plot_waveform(self.currently_playing, current_time)
 
     def plot_waveform(self, file_path, current_time=0):
-        y, sr = librosa.load(file_path)
+        y, sr = librosa.load(file_path, sr=None, mono=False)
         total_time = librosa.get_duration(y=y, sr=sr)
         current_samples = int(current_time * sr)
+        bit_rate = 16  # Assuming 16-bit audio
 
+        # Downsample for performance
+        downsample_factor = max(1, len(y) // 10000)
+        y = y[::downsample_factor]
+        sr = sr // downsample_factor
 
         self.ax.clear()
-        self.ax.plot(np.arange(len(y)) / sr, y, color="gray")
-        if current_samples > 0:
-            self.ax.plot(np.arange(current_samples) / sr, y[:current_samples], color="blue")
-        self.ax.set_title("Waveform")
-        self.ax.set_xlabel("Time (s)")
-        self.ax.set_ylabel("Amplitude")
-        self.canvas.draw()  # 在这里更新画布
+        if y.ndim == 1:
+            self.ax.plot(np.arange(len(y)) / sr, y, color="gray")
+            if current_samples > 0:
+                self.ax.plot(np.arange(current_samples) / sr, y[:current_samples], color="blue")
+        else:
+            self.ax.plot(np.arange(len(y[0])) / sr, y[0], color="gray", label="Left Channel")
+            self.ax.plot(np.arange(len(y[1])) / sr, y[1], color="red", label="Right Channel")
+            if current_samples > 0:
+                self.ax.plot(np.arange(current_samples) / sr, y[0][:current_samples], color="blue")
+                self.ax.plot(np.arange(current_samples) / sr, y[1][:current_samples], color="orange")
+            self.ax.legend()
 
-        def on_click(event):
-            if event.inaxes == self.ax:
-                click_time = event.xdata
-                position = (click_time / total_time) * 100
-                self.set_position(position)
-
-        self.canvas.mpl_connect('button_press_event', on_click)
-
-    def format_time(self, seconds):
-        mins = int(seconds // 60)
-        secs = int(seconds % 60)
-        return f"{mins:02}:{secs:02}"
-
-    def plot_waveform(self, file_path, current_time=0):
-        y, sr = librosa.load(file_path)
-        total_time = librosa.get_duration(y=y, sr=sr)
-        current_samples = int(current_time * sr)
-        self.ax.clear()
-        self.ax.plot(np.arange(len(y)) / sr, y, color="gray")
-        self.ax.plot(np.arange(current_samples) / sr, y[:current_samples], color="blue")
-        self.ax.set_title("Waveform")
+        self.ax.set_title(f"Waveform (Sample Rate: {sr} Hz, Bit Rate: {bit_rate} bits, Channels: {'Mono' if y.ndim == 1 else 'Stereo'})")
         self.ax.set_xlabel("Time (s)")
         self.ax.set_ylabel("Amplitude")
         self.ax.text(0.95, 0.01, f"{self.format_time(current_time)} / {self.format_time(total_time)}",
@@ -222,8 +248,6 @@ class AudioManager(QMainWindow):
 
     def on_waveform_click(self, event):
         if self.currently_playing:
-            y, sr = librosa.load(self.currently_playing)
-            total_time = librosa.get_duration(y=y, sr=sr)
             click_time = event.xdata
             if click_time is not None:
                 pygame.mixer.music.play(0, click_time)
@@ -234,19 +258,40 @@ class AudioManager(QMainWindow):
         secs = int(seconds % 60)
         return f"{mins:02}:{secs:02}"
 
-    def mousePressEvent(self, event):
-        if event.button() == Qt.LeftButton:
-            self.startDrag(event)
+    def dragEnterEvent(self, event: QDragEnterEvent):
+        if event.mimeData().hasUrls():
+            event.acceptProposedAction()
+            self.log_label.setText("Release mouse to load reference file")
+            self.log_label.setVisible(True)
+            self.overlay.setVisible(True)
+            self.set_elements_enabled(False, exclude=[self.progress_bar, self.log_label])
 
-    def startDrag(self, event):
-        index = self.table_widget.indexAt(event.pos())
-        if index.isValid():
-            path = self.table_widget.item(index.row(), 1).text()
-            mimeData = QMimeData()
-            mimeData.setUrls([Qt.QUrl.fromLocalFile(path)])
-            drag = QDrag(self)
-            drag.setMimeData(mimeData)
-            drag.exec_(Qt.CopyAction | Qt.MoveAction)
+    def dragLeaveEvent(self, event):
+        self.log_label.setVisible(False)
+        self.overlay.setVisible(False)
+        self.set_elements_enabled(True)
+
+    def dropEvent(self, event: QDropEvent):
+        self.log_label.setVisible(False)
+        self.overlay.setVisible(False)
+        self.set_elements_enabled(True)
+        for url in event.mimeData().urls():
+            file_path = url.toLocalFile()
+            if file_path.endswith(('.wav', '.mp3')):
+                self.process_reference_audio(file_path)
+                break
+
+    def set_elements_enabled(self, enabled, exclude=[]):
+        elements = [
+            self.reference_label, self.play_pause_button, self.upload_button,
+            self.settings_button, self.table_widget, self.progress_label, self.canvas
+        ]
+        for element in elements:
+            if element not in exclude:
+                element.setEnabled(enabled)
+
+    def update_refresh_rate(self):
+        self.timer.setInterval(self.refresh_rate_spinbox.value())
 
 if __name__ == "__main__":
     app = QApplication(sys.argv)

@@ -4,9 +4,15 @@
     <option name="autoReloadType" value="SELECTIVE" />
   </component>
   <component name="ChangeListManager">
-    <list default="true" id="15905821-475b-441d-86ec-4be39027e9a5" name="更改" comment="修改目录">
+    <list default="true" id="15905821-475b-441d-86ec-4be39027e9a5" name="更改" comment="调整波形显示和大小">
+      <change afterPath="$PROJECT_DIR$/AudioProcessor.py" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/SettingsDialog.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/.idea/AudioManager.iml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/AudioManager.iml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/.idea/misc.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/misc.xml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/.idea/runConfigurations/_template__of_Python.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/runConfigurations/_template__of_Python.xml" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/AudioManagerMain.py" beforeDir="false" afterPath="$PROJECT_DIR$/AudioManagerMain.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/config.txt" beforeDir="false" afterPath="$PROJECT_DIR$/config.txt" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -37,11 +43,11 @@
   <component name="GithubPullRequestsUISettings">{
   &quot;selectedUrlAndAccountId&quot;: {
     &quot;url&quot;: &quot;https://github.com/836157055/AudioManager.git&quot;,
-    &quot;accountId&quot;: &quot;8425c2ef-3c65-4336-b6d7-099b7b5a92d0&quot;
+    &quot;accountId&quot;: &quot;e0e9bd5e-c66d-4f3d-8414-46c1ca78633f&quot;
   }
 }</component>
   <component name="ProblemsViewState">
-    <option name="selectedTabId" value="DEPENDENCY_CHECKER_PROBLEMS_TAB" />
+    <option name="selectedTabId" value="CurrentFile" />
   </component>
   <component name="ProjectColorInfo">{
   &quot;associatedIndex&quot;: 0
@@ -52,25 +58,25 @@
     <option name="hideEmptyMiddlePackages" value="true" />
     <option name="showLibraryContents" value="true" />
   </component>
-  <component name="PropertiesComponent">{
-  &quot;keyToString&quot;: {
-    &quot;Python.AudioManagerMain.executor&quot;: &quot;Debug&quot;,
-    &quot;Python.Main.executor&quot;: &quot;Run&quot;,
-    &quot;RunOnceActivity.ShowReadmeOnStart&quot;: &quot;true&quot;,
-    &quot;git-widget-placeholder&quot;: &quot;Main&quot;,
-    &quot;last_opened_file_path&quot;: &quot;D:/python工程/AudioManager&quot;,
-    &quot;settings.editor.selected.configurable&quot;: &quot;preferences.pluginManager&quot;
+  <component name="PropertiesComponent"><![CDATA[{
+  "keyToString": {
+    "Python.AudioManagerMain.executor": "Run",
+    "Python.Main.executor": "Run",
+    "RunOnceActivity.ShowReadmeOnStart": "true",
+    "git-widget-placeholder": "Main",
+    "last_opened_file_path": "D:/python工程/AudioManager",
+    "settings.editor.selected.configurable": "com.github.copilot.settings.ApplicationConfigurable"
   }
-}</component>
+}]]></component>
   <component name="RecentsManager">
     <key name="MoveFile.RECENT_KEYS">
       <recent name="D:\python工程\AudioManager" />
     </key>
   </component>
   <component name="RunManager">
-    <configuration name="Main" type="PythonConfigurationType" factoryName="Python" activateToolWindowBeforeRun="false">
+    <configuration name="Main" type="PythonConfigurationType" factoryName="Python">
       <module name="AudioManager" />
-      <option name="ENV_FILES" value="$PROJECT_DIR$/.venv/pyvenv.cfg" />
+      <option name="ENV_FILES" value="$PROJECT_DIR$/venv/pyvenv.cfg" />
       <option name="INTERPRETER_OPTIONS" value="" />
       <option name="PARENT_ENVS" value="true" />
       <envs>
@@ -82,7 +88,7 @@
       <option name="ADD_CONTENT_ROOTS" value="true" />
       <option name="ADD_SOURCE_ROOTS" value="true" />
       <option name="SCRIPT_NAME" value="$PROJECT_DIR$/AudioManagerMain.py" />
-      <option name="PARAMETERS" value="$AffectedModuleNames$" />
+      <option name="PARAMETERS" value="" />
       <option name="SHOW_COMMAND_LINE" value="false" />
       <option name="EMULATE_TERMINAL" value="true" />
       <option name="MODULE_MODE" value="false" />
@@ -118,7 +124,15 @@
       <option name="project" value="LOCAL" />
       <updated>1731310247428</updated>
     </task>
-    <option name="localTasksCounter" value="2" />
+    <task id="LOCAL-00002" summary="调整波形显示和大小">
+      <option name="closed" value="true" />
+      <created>1731321949630</created>
+      <option name="number" value="00002" />
+      <option name="presentableId" value="LOCAL-00002" />
+      <option name="project" value="LOCAL" />
+      <updated>1731321949630</updated>
+    </task>
+    <option name="localTasksCounter" value="3" />
     <servers />
   </component>
   <component name="Vcs.Log.History.Properties">
@@ -131,8 +145,20 @@
       </list>
     </option>
   </component>
+  <component name="Vcs.Log.Tabs.Properties">
+    <option name="TAB_STATES">
+      <map>
+        <entry key="MAIN">
+          <value>
+            <State />
+          </value>
+        </entry>
+      </map>
+    </option>
+  </component>
   <component name="VcsManagerConfiguration">
     <MESSAGE value="修改目录" />
-    <option name="LAST_COMMIT_MESSAGE" value="修改目录" />
+    <MESSAGE value="调整波形显示和大小" />
+    <option name="LAST_COMMIT_MESSAGE" value="调整波形显示和大小" />
   </component>
 </project>
