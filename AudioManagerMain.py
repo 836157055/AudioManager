@@ -1,3 +1,4 @@
+import shutil
 import sys
 import os
 import pygame
@@ -9,6 +10,7 @@ from PyQt5.QtWidgets import QApplication, QMainWindow, QWidget, QVBoxLayout, QPu
 from PyQt5.QtCore import Qt, QTimer, QThread, QMimeData, QUrl
 from PyQt5.QtGui import QDragEnterEvent, QDropEvent, QFont, QMouseEvent, QDrag
 
+from DraggableTableWidget import DraggableTableWidget
 from extract_features import extract_features
 from calculate_similarity import calculate_similarity
 from SettingsDialog import SettingsDialog
@@ -64,13 +66,15 @@ class AudioManager(QMainWindow):
         self.log_layout.addWidget(self.close_log_button)
         self.layout.addLayout(self.log_layout)
 
-        self.table_widget = QTableWidget()
+        self.table_widget = DraggableTableWidget()
         self.table_widget.setColumnCount(4)
-        self.table_widget.setHorizontalHeaderLabels(["文件名", "路径", "相似度", "播放"])
+        self.table_widget.setHorizontalHeaderLabels(["文件", "路径", "相似度", "播放"])
         self.table_widget.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch)
         self.table_widget.setSelectionBehavior(QAbstractItemView.SelectRows)
         self.table_widget.setEditTriggers(QAbstractItemView.NoEditTriggers)  # Make the table read-only
         self.layout.addWidget(self.table_widget)
+        self.table_widget.setContextMenuPolicy(Qt.CustomContextMenu)
+        self.table_widget.customContextMenuRequested.connect(self.show_context_menu)
 
         self.progress_label = QLabel("进度: 00:00 / 00:00")
         self.layout.addWidget(self.progress_label)
@@ -101,6 +105,10 @@ class AudioManager(QMainWindow):
 
         self.table_widget.setDragEnabled(True)
         self.table_widget.setDragDropMode(QAbstractItemView.DragOnly)
+
+        self.table_widget.setContextMenuPolicy(Qt.CustomContextMenu)
+        self.table_widget.customContextMenuRequested.connect(self.show_context_menu)
+
 
     def load_settings(self):
         self.audio_library_paths = []
@@ -411,6 +419,21 @@ class AudioManager(QMainWindow):
     def close_log(self):
         self.log_label.setVisible(False)
         self.close_log_button.setVisible(False)
+
+    def show_context_menu(self, position):
+        menu = QMenu()
+        copy_action = QAction("复制文件路径", self)
+        copy_action.triggered.connect(self.copy_file_path)
+        menu.addAction(copy_action)
+        menu.exec_(self.table_widget.viewport().mapToGlobal(position))
+
+    def copy_file_path(self):
+        item = self.table_widget.currentItem()
+        if item:
+            file_path = self.table_widget.item(self.table_widget.currentRow(), 1).text()
+            destination_path, _ = QFileDialog.getSaveFileName(self, "保存文件", file_path)
+            if destination_path:
+                shutil.copy(file_path, destination_path)
 
 if __name__ == "__main__":
     app = QApplication(sys.argv)
