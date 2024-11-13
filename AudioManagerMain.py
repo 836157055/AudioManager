@@ -3,9 +3,11 @@ import os
 import pygame
 import librosa
 import numpy as np
-from PyQt5.QtWidgets import QApplication, QMainWindow, QWidget, QVBoxLayout, QPushButton, QFileDialog, QTableWidget, QTableWidgetItem, QHeaderView, QAbstractItemView, QLabel, QProgressBar, QHBoxLayout, QSlider, QMenuBar, QMenu, QAction
-from PyQt5.QtCore import Qt, QTimer, QThread, pyqtSignal
-from PyQt5.QtGui import QDragEnterEvent, QDropEvent, QFont
+from PyQt5.QtWidgets import QApplication, QMainWindow, QWidget, QVBoxLayout, QPushButton, QFileDialog, QTableWidget, \
+    QTableWidgetItem, QHeaderView, QAbstractItemView, QLabel, QProgressBar, QHBoxLayout, QSlider, QMenuBar, QMenu, \
+    QAction, QStyle
+from PyQt5.QtCore import Qt, QTimer, QThread, QMimeData, QUrl
+from PyQt5.QtGui import QDragEnterEvent, QDropEvent, QFont, QMouseEvent, QDrag
 
 from extract_features import extract_features
 from calculate_similarity import calculate_similarity
@@ -76,6 +78,7 @@ class AudioManager(QMainWindow):
         self.slider = QSlider(Qt.Horizontal)
         self.slider.setRange(0, 100)
         self.slider.sliderMoved.connect(self.set_position)
+        self.slider.mousePressEvent = self.slider_mouse_press_event
         self.layout.addWidget(self.slider)
 
         self.overlay = QLabel(self.central_widget)
@@ -89,10 +92,15 @@ class AudioManager(QMainWindow):
         self.timer.setInterval(500)
         self.timer.timeout.connect(self.update_progress)
         self.similar_files = []
+        self.new_time = 0
 
         self.load_settings()
 
         self.setAcceptDrops(True)
+        self.is_setting_position = False
+
+        self.table_widget.setDragEnabled(True)
+        self.table_widget.setDragDropMode(QAbstractItemView.DragOnly)
 
     def load_settings(self):
         self.audio_library_paths = []
@@ -189,6 +197,8 @@ class AudioManager(QMainWindow):
                 play_button = QPushButton("播放")
                 play_button.clicked.connect(lambda _, p=path, b=play_button: self.on_play_button_click(p, b))
                 self.table_widget.setCellWidget(idx, 3, play_button)
+                self.table_widget.setDragEnabled(True)
+                self.table_widget.setDragDropMode(QAbstractItemView.DragOnly)
             self.progress_bar.setVisible(False)
             self.log_label.setVisible(False)
             self.close_log_button.setVisible(False)
@@ -200,6 +210,22 @@ class AudioManager(QMainWindow):
             self.log_label.setStyleSheet("background-color: red; font-size: 16px;")
             self.log_label.setVisible(True)
             self.close_log_button.setVisible(True)
+
+    def startDrag(self, supportedActions):
+        item = self.table_widget.currentItem()
+        if item:
+            mimeData = QMimeData()
+            file_path = self.table_widget.item(self.table_widget.currentRow(), 1).text()
+            url = QUrl.fromLocalFile(file_path)
+            mimeData.setUrls([url])
+            drag = QDrag(self)
+            drag.setMimeData(mimeData)
+            drag.exec_(Qt.CopyAction | Qt.MoveAction)
+
+    def keyPressEvent(self, event):
+        if event.key() == Qt.Key_Space:
+            self.play_pause_reference()
+        super().keyPressEvent(event)
 
     def play_pause_reference(self):
         try:
@@ -252,22 +278,65 @@ class AudioManager(QMainWindow):
 
     def on_playback_complete(self):
         self.timer.stop()
+        self.new_time = 0
         self.currently_playing = None
         self.progress_label.setText("进度: 00:00 / 00:00")
         self.play_pause_button.setText("播放")
+        # self.progress_label.setText(f"进度: {self.format_time(0)} / {self.format_time(0)}")
+        self.slider.setValue(int(0))
         for idx in range(self.table_widget.rowCount()):
             play_button = self.table_widget.cellWidget(idx, 3)
             if play_button:
                 play_button.setText("播放")
 
-    def update_progress(self):
+    def set_position(self, position):
         try:
             if self.currently_playing:
-                current_time = pygame.mixer.music.get_pos() / 1000
+                self.is_setting_position = True  # Set the flag
                 total_time = librosa.get_duration(path=self.currently_playing)
-                self.progress_label.setText(f"进度: {self.format_time(current_time)} / {self.format_time(total_time)}")
-                self.slider.setValue(int((current_time / total_time) * 100))
-                if current_time >= total_time:
+                self.new_time = (position / 100) * total_time
+                pygame.mixer.music.stop()
+                pygame.mixer.music.load(self.currently_playing)
+                pygame.mixer.music.play()
+                pygame.mixer.music.set_pos(self.new_time)
+                self.slider.setValue(position)
+                self.progress_label.setText(f"进度: {self.format_time(self.new_time)} / {self.format_time(total_time)}")
+                self.is_setting_position = False  # Reset the flag
+                self.timer.start()  # Ensure the timer is running to update progress
+
+                # Create a QTimer to forcefully synchronize after 500 milliseconds
+                QTimer.singleShot(500, lambda: self.force_sync_position())
+        except Exception as e:
+            self.log_label.setText(f"错误: {str(e)}")
+            self.log_label.setStyleSheet("background-color: red; font-size: 16px;")
+            self.log_label.setVisible(True)
+            self.close_log_button.setVisible(True)
+
+    def force_sync_position(self):
+        try:
+            if self.currently_playing:
+                total_time = librosa.get_duration(path=self.currently_playing)
+                self.progress_label.setText(f"进度: {self.format_time(self.new_time)} / {self.format_time(total_time)}")
+                self.slider.setValue(int((self.new_time / total_time) * 100))
+        except Exception as e:
+            self.log_label.setText(f"错误: {str(e)}")
+            self.log_label.setStyleSheet("background-color: red; font-size: 16px;")
+            self.log_label.setVisible(True)
+            self.close_log_button.setVisible(True)
+
+    def update_progress(self):
+        try:
+            if self.currently_playing and not self.is_setting_position:  # Check the flag
+                current_time = pygame.mixer.music.get_pos() / 1000
+                if current_time < 0:
+                    current_time = 0
+                total_time = librosa.get_duration(path=self.currently_playing)
+                actual_time = self.new_time + current_time
+
+                self.progress_label.setText(f"进度: {self.format_time(actual_time)} / {self.format_time(total_time)}")
+                self.slider.setValue(int((actual_time / total_time) * 100))
+
+                if actual_time >= total_time or current_time == 0:
                     self.on_playback_complete()
         except Exception as e:
             self.log_label.setText(f"错误: {str(e)}")
@@ -275,18 +344,11 @@ class AudioManager(QMainWindow):
             self.log_label.setVisible(True)
             self.close_log_button.setVisible(True)
 
-    def set_position(self, position):
-        try:
-            if self.currently_playing:
-                total_time = librosa.get_duration(path=self.currently_playing)
-                new_time = (position / 100) * total_time
-                pygame.mixer.music.play(start=new_time)
-                self.update_progress()
-        except Exception as e:
-            self.log_label.setText(f"错误: {str(e)}")
-            self.log_label.setStyleSheet("background-color: red; font-size: 16px;")
-            self.log_label.setVisible(True)
-            self.close_log_button.setVisible(True)
+    def slider_mouse_press_event(self, event: QMouseEvent):
+        pos = event.pos()
+        value = QStyle.sliderValueFromPosition(self.slider.minimum(), self.slider.maximum(), pos.x(), self.slider.width())
+        self.slider.setValue(value)
+        self.set_position(value)
 
     def format_time(self, seconds):
         mins = int(seconds // 60)

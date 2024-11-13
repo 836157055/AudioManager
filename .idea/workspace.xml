@@ -4,10 +4,9 @@
     <option name="autoReloadType" value="SELECTIVE" />
   </component>
   <component name="ChangeListManager">
-    <list default="true" id="15905821-475b-441d-86ec-4be39027e9a5" name="更改" comment="修改波形显示和界面相关">
+    <list default="true" id="15905821-475b-441d-86ec-4be39027e9a5" name="更改" comment="">
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/AudioManagerMain.py" beforeDir="false" afterPath="$PROJECT_DIR$/AudioManagerMain.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/SettingsDialog.py" beforeDir="false" afterPath="$PROJECT_DIR$/SettingsDialog.py" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/config.txt" beforeDir="false" afterPath="$PROJECT_DIR$/config.txt" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
@@ -136,7 +135,15 @@
       <option name="project" value="LOCAL" />
       <updated>1731395024655</updated>
     </task>
-    <option name="localTasksCounter" value="4" />
+    <task id="LOCAL-00004" summary="修改波形显示和界面相关">
+      <option name="closed" value="true" />
+      <created>1731409518294</created>
+      <option name="number" value="00004" />
+      <option name="presentableId" value="LOCAL-00004" />
+      <option name="project" value="LOCAL" />
+      <updated>1731409518294</updated>
+    </task>
+    <option name="localTasksCounter" value="5" />
     <servers />
   </component>
   <component name="Vcs.Log.History.Properties">
