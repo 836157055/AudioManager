@@ -1,4 +1,4 @@
-from PyQt5.QtWidgets import QDialog, QVBoxLayout, QPushButton, QListWidget, QHBoxLayout, QFileDialog, QRadioButton, QLabel, QButtonGroup
+from PyQt5.QtWidgets import QDialog, QVBoxLayout, QPushButton, QListWidget, QFileDialog, QRadioButton, QLabel, QButtonGroup
 
 class SettingsDialog(QDialog):
     def __init__(self, parent=None):

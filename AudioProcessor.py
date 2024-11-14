@@ -7,6 +7,7 @@ from calculate_similarity import calculate_similarity
 class AudioProcessor(QObject):
     progress = pyqtSignal(int, int)
     finished = pyqtSignal(list)
+    error = pyqtSignal(str)  # Add this line to define the error signal
 
     def __init__(self, paths, ref_mfcc, cache):
         super().__init__()
@@ -23,13 +24,16 @@ class AudioProcessor(QObject):
                 for file in files:
                     if file.endswith(".wav"):
                         audio_path = os.path.join(root, file)
-                        if audio_path in self.cache:
-                            lib_mfcc = np.array(self.cache[audio_path])
-                        else:
-                            lib_mfcc = extract_features(audio_path)
-                            self.cache[audio_path] = lib_mfcc.tolist()
-                        similarity = calculate_similarity(self.ref_mfcc, lib_mfcc)
-                        similar_files.append((file, audio_path, similarity))
+                        try:
+                            if audio_path in self.cache:
+                                lib_mfcc = np.array(self.cache[audio_path])
+                            else:
+                                lib_mfcc = extract_features(audio_path)
+                                self.cache[audio_path] = lib_mfcc.tolist()
+                            similarity = calculate_similarity(self.ref_mfcc, lib_mfcc)
+                            similar_files.append((file, audio_path, similarity))
+                        except Exception as e:
+                            self.error.emit(f"Error processing {audio_path}: {e}")  # Emit error signal
                         processed_files += 1
                         self.progress.emit(processed_files, total_files)
         similar_files.sort(key=lambda x: x[2])

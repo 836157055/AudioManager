@@ -7,7 +7,7 @@ import librosa
 import numpy as np
 from PyQt5.QtWidgets import QApplication, QMainWindow, QWidget, QVBoxLayout, QPushButton, QFileDialog, QTableWidget, \
     QTableWidgetItem, QHeaderView, QAbstractItemView, QLabel, QProgressBar, QHBoxLayout, QSlider, QMenuBar, QMenu, \
-    QAction, QStyle
+    QAction, QStyle, QMessageBox
 from PyQt5.QtCore import Qt, QTimer, QThread, QMimeData, QUrl
 from PyQt5.QtGui import QDragEnterEvent, QDropEvent, QFont, QMouseEvent, QDrag
 
@@ -115,43 +115,43 @@ class AudioManager(QMainWindow):
         self.table_widget.setContextMenuPolicy(Qt.CustomContextMenu)
         self.table_widget.customContextMenuRequested.connect(self.show_context_menu)
 
-
     def load_settings(self):
         self.audio_library_paths = []
         self.refresh_rate = 500
-        if os.path.exists("config.txt"):
-            with open("config.txt", "r") as file:
-                lines = file.readlines()
-                self.audio_library_paths = [line.strip() for line in lines[:-1]]
-                try:
-                    self.refresh_rate = int(lines[-1].strip())
-                except ValueError:
-                    self.refresh_rate = 500  # Default value if the last line is not an integer
+        if os.path.exists("config.json"):
+            with open("config.json", "r") as file:
+                config = json.load(file)
+                self.audio_library_paths = config.get("audio_library_paths", [])
+                self.refresh_rate = config.get("refresh_rate", 500)
         self.timer.setInterval(self.refresh_rate)
 
     def save_settings(self):
-        with open("config.txt", "w") as file:
-            for path in self.audio_library_paths:
-                file.write(f"{path}\n")
-            file.write(f"{self.refresh_rate}\n")
+        config = {
+            "audio_library_paths": self.audio_library_paths,
+            "refresh_rate": self.refresh_rate
+        }
+        with open("config.json", "w") as file:
+            json.dump(config, file, indent=4)
 
     def import_settings(self):
-        file_path, _ = QFileDialog.getOpenFileName(self, "导入设置", "", "配置文件 (*.txt)")
+        file_path, _ = QFileDialog.getOpenFileName(self, "导入设置", "", "配置文件 (*.json)")
         if file_path:
             with open(file_path, "r") as file:
-                lines = file.readlines()
-                self.audio_library_paths = [line.strip() for line in lines[:-1]]
-                self.refresh_rate = int(lines[-1].strip())
+                config = json.load(file)
+                self.audio_library_paths = config.get("audio_library_paths", [])
+                self.refresh_rate = config.get("refresh_rate", 500)
             self.save_settings()
             self.timer.setInterval(self.refresh_rate)
 
     def export_settings(self):
-        file_path, _ = QFileDialog.getSaveFileName(self, "导出设置", "", "配置文件 (*.txt)")
+        file_path, _ = QFileDialog.getSaveFileName(self, "导出设置", "", "配置文件 (*.json)")
         if file_path:
+            config = {
+                "audio_library_paths": self.audio_library_paths,
+                "refresh_rate": self.refresh_rate
+            }
             with open(file_path, "w") as file:
-                for path in self.audio_library_paths:
-                    file.write(f"{path}\n")
-                file.write(f"{self.refresh_rate}\n")
+                json.dump(config, file, indent=4)
 
     def open_settings(self):
         dialog = SettingsDialog(self)
@@ -178,6 +178,9 @@ class AudioManager(QMainWindow):
         return {}
 
     def upload_reference_audio(self):
+        if not self.audio_library_paths:
+            QMessageBox.warning(self, "警告", "音频库设置里不存在任何路径")
+            return
         file_path, _ = QFileDialog.getOpenFileName(self, "打开参考音频", "", "音频文件 (*.wav *.mp3)")
         if file_path:
             self.process_reference_audio(file_path)
@@ -203,6 +206,7 @@ class AudioManager(QMainWindow):
             self.worker.moveToThread(self.thread)
             self.worker.progress.connect(self.update_progress_bar)
             self.worker.finished.connect(self.display_results)
+            self.worker.error.connect(self.log_error)  # Connect the error signal to the log_error slot
             self.thread.started.connect(self.worker.run)
             self.thread.start()
         except Exception as e:
@@ -210,6 +214,12 @@ class AudioManager(QMainWindow):
             self.log_label.setStyleSheet("background-color: red; font-size: 16px;")
             self.log_label.setVisible(True)
             self.close_log_button.setVisible(True)
+
+    def log_error(self, message):
+        self.log_label.setText(message)
+        self.log_label.setStyleSheet("background-color: red; font-size: 16px;")
+        self.log_label.setVisible(True)
+        self.close_log_button.setVisible(True)
 
     def update_progress_bar(self, value, total):
         self.progress_bar.setMaximum(total)
@@ -445,9 +455,6 @@ class AudioManager(QMainWindow):
 
     def show_context_menu(self, position):
         menu = QMenu()
-        copy_action = QAction("复制文件路径", self)
-        copy_action.triggered.connect(self.copy_file_path)
-        menu.addAction(copy_action)
         menu.exec_(self.table_widget.viewport().mapToGlobal(position))
 
     def copy_file_path(self):
