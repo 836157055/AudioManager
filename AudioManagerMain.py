@@ -1,3 +1,4 @@
+import json
 import shutil
 import sys
 import os
@@ -38,6 +39,10 @@ class AudioManager(QMainWindow):
         self.settings_action = QAction("打开设置", self)
         self.settings_action.triggered.connect(self.open_settings)
         self.settings_menu.addAction(self.settings_action)
+
+        self.reload_action = QAction("重新载入音频库数据", self)
+        self.reload_action.triggered.connect(self.reload_audio_library_data)
+        self.settings_menu.addAction(self.reload_action)
 
         self.reference_control_layout = QHBoxLayout()
         self.reference_label = QLabel("参考音频: 无")
@@ -99,6 +104,7 @@ class AudioManager(QMainWindow):
         self.new_time = 0
 
         self.load_settings()
+        self.audio_library_cache = self.load_audio_library_cache()  # Initialize the cache
 
         self.setAcceptDrops(True)
         self.is_setting_position = False
@@ -155,6 +161,22 @@ class AudioManager(QMainWindow):
             self.save_settings()
             self.timer.setInterval(self.refresh_rate)
 
+    def reload_audio_library_data(self):
+        self.audio_library_cache = {}
+        self.save_audio_library_cache(self.audio_library_cache)
+        if hasattr(self, 'reference_file_path'):
+            self.process_audio(self.reference_file_path)
+
+    def save_audio_library_cache(self, audio_library_data):
+        with open("audio_library_cache.json", "w") as cache_file:
+            json.dump(audio_library_data, cache_file)
+
+    def load_audio_library_cache(self):
+        if os.path.exists("audio_library_cache.json"):
+            with open("audio_library_cache.json", "r") as cache_file:
+                return json.load(cache_file)
+        return {}
+
     def upload_reference_audio(self):
         file_path, _ = QFileDialog.getOpenFileName(self, "打开参考音频", "", "音频文件 (*.wav *.mp3)")
         if file_path:
@@ -177,7 +199,7 @@ class AudioManager(QMainWindow):
             self.ref_mfcc = extract_features(file_path)
             self.similar_files = []
             self.thread = QThread()
-            self.worker = AudioProcessor(self.audio_library_paths, self.ref_mfcc)
+            self.worker = AudioProcessor(self.audio_library_paths, self.ref_mfcc, self.audio_library_cache)
             self.worker.moveToThread(self.thread)
             self.worker.progress.connect(self.update_progress_bar)
             self.worker.finished.connect(self.display_results)
@@ -213,6 +235,7 @@ class AudioManager(QMainWindow):
             self.overlay.setVisible(False)
             self.set_elements_enabled(True)
             self.thread.quit()
+            self.save_audio_library_cache(self.audio_library_cache)  # Save cache after processing
         except Exception as e:
             self.log_label.setText(f"错误: {str(e)}")
             self.log_label.setStyleSheet("background-color: red; font-size: 16px;")

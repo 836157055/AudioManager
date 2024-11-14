@@ -1,18 +1,18 @@
 import os
-
+import numpy as np
 from PyQt5.QtCore import QObject, pyqtSignal
 from extract_features import extract_features
 from calculate_similarity import calculate_similarity
-
 
 class AudioProcessor(QObject):
     progress = pyqtSignal(int, int)
     finished = pyqtSignal(list)
 
-    def __init__(self, paths, ref_mfcc):
+    def __init__(self, paths, ref_mfcc, cache):
         super().__init__()
         self.paths = paths
         self.ref_mfcc = ref_mfcc
+        self.cache = cache
 
     def run(self):
         similar_files = []
@@ -23,7 +23,11 @@ class AudioProcessor(QObject):
                 for file in files:
                     if file.endswith(".wav"):
                         audio_path = os.path.join(root, file)
-                        lib_mfcc = extract_features(audio_path)
+                        if audio_path in self.cache:
+                            lib_mfcc = np.array(self.cache[audio_path])
+                        else:
+                            lib_mfcc = extract_features(audio_path)
+                            self.cache[audio_path] = lib_mfcc.tolist()
                         similarity = calculate_similarity(self.ref_mfcc, lib_mfcc)
                         similar_files.append((file, audio_path, similarity))
                         processed_files += 1
